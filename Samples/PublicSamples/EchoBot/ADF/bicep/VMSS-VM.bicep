@@ -176,7 +176,6 @@ resource VMSS 'Microsoft.Compute/virtualMachineScaleSets@2021-07-01' = {
     }
     virtualMachineProfile: {
       priority: 'Regular'
-      evictionPolicy: 'Deallocate'
       licenseType: contains(OSType[AppServer.OSType], 'licenseType') ? OSType[AppServer.OSType].licenseType : null
       osProfile: {
         computerNamePrefix: VM.vmHostName
