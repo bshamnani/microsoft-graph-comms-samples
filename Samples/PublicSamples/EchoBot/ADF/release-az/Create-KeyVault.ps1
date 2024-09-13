@@ -60,7 +60,7 @@ if (Get-AzKeyVault -Name $KVName -EA SilentlyContinue)
 {
     try
     {
-        $CurrentUserId = Get-AzContext | ForEach-Object account | ForEach-Object Id
+        $CurrentUserId = "bhavesh_s_outlook.com#EXT#@bhaveshsoutlook.onmicrosoft.com"
         if (! (Get-AzRoleAssignment -ResourceGroupName $RGName -SignInName $CurrentUserId -RoleDefinitionName $RoleName))
         {
             New-AzRoleAssignment -ResourceGroupName $RGName -SignInName $CurrentUserId -RoleDefinitionName $RoleName -Verbose
