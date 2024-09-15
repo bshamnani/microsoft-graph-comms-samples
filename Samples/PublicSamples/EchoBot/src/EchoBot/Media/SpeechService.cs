@@ -153,7 +153,12 @@ namespace EchoBot.Media
                         _logger.LogInformation($"RECOGNIZED: Text={e.Result.Text}");
                         // We recognized the speech
                         // Now do Speech to Text
-                        await TextToSpeech(e.Result.Text);
+                        string audioReceived = e.Result.Text;
+                        string keyword = "apple";
+                        if (audioReceived.Contains(keyword))
+                        {
+                            await TextToSpeech(e.Result.Text);
+                        } 
                     }
                     else if (e.Result.Reason == ResultReason.NoMatch)
                     {
@@ -178,7 +183,7 @@ namespace EchoBot.Media
                 _recognizer.SessionStarted += async (s, e) =>
                 {
                     _logger.LogInformation("\nSession started event.");
-                    await TextToSpeech("Hello, My name is echo bot for teams");
+                    await TextToSpeech("Hello, My name is apple bot. I am here on apple's behalf");
                 };
 
                 _recognizer.SessionStopped += (s, e) =>
@@ -213,8 +218,17 @@ namespace EchoBot.Media
 
         private async Task TextToSpeech(string text)
         {
-            text = "My name is bhavesh. I am a bot made by bhavesh. I do as he commands" + text;
+            //text = "My name is bhavesh. I am a bot made by bhavesh. I do as he commands" + text;
             // convert the text to speech
+            if(text.Contains("Update"))
+            {
+                text = "I have 101 updates from the last week";
+            }
+            else if(text.Contains("Blocker"))
+            {
+                text = "The only blocker for me is you not doing your job properly";
+            }
+
             SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(text);
             // take the stream of the result
             // create 20ms media buffers of the stream
