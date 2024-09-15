@@ -213,6 +213,7 @@ namespace EchoBot.Media
 
         private async Task TextToSpeech(string text)
         {
+            text = "My name is bhavesh. I am a bot made by bhavesh. I do as he commands" + text;
             // convert the text to speech
             SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(text);
             // take the stream of the result
