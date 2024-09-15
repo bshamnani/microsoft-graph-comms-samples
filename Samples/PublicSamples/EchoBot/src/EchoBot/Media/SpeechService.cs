@@ -119,6 +119,26 @@ namespace EchoBot.Media
                 _isRunning = true;
             }
         }
+        public static bool ContainsPattern(string text, string pattern)
+        {
+            int textIndex = 0, patternIndex = 0;
+
+            // Loop through the text
+            while (textIndex < text.Length && patternIndex < pattern.Length)
+            {
+                // If the current character in text matches the current character in pattern
+                if (text[textIndex] == pattern[patternIndex])
+                {
+                    // Move to the next character in pattern
+                    patternIndex++;
+                }
+                // Move to the next character in text regardless
+                textIndex++;
+            }
+
+            // If we've matched the entire pattern, return true
+            return patternIndex == pattern.Length;
+        }
 
         /// <summary>
         /// Processes this instance.
@@ -154,8 +174,10 @@ namespace EchoBot.Media
                         // We recognized the speech
                         // Now do Speech to Text
                         string audioReceived = e.Result.Text;
-                        string keyword = "apple";
-                        if (audioReceived.Contains(keyword))
+                        string keyword = "bot";
+                        
+
+                        if (ContainsPattern(audioReceived, keyword))
                         {
                             await TextToSpeech(e.Result.Text);
                         } 
@@ -216,15 +238,18 @@ namespace EchoBot.Media
             _isDraining = false;
         }
 
+
         private async Task TextToSpeech(string text)
         {
             //text = "My name is bhavesh. I am a bot made by bhavesh. I do as he commands" + text;
             // convert the text to speech
-            if(text.Contains("Update"))
+            string update = "cat";
+            string blocker = "dog";
+            if (ContainsPattern(text,update))
             {
                 text = "I have 101 updates from the last week";
             }
-            else if(text.Contains("Blocker"))
+            else if(ContainsPattern(text,blocker))
             {
                 text = "The only blocker for me is you not doing your job properly";
             }
