@@ -24,6 +24,12 @@ namespace EchoBot.Models
         /// <value>The join URL.</value>
         public string JoinUrl { get; set; }
 
+        public string? PersonName { get; set; }
+
+        public string? Status { get; set; }
+        public string? Blocker { get; set; }
+
+
         /// <summary>
         /// Gets or sets the display name.
         /// Teams client does not allow changing of ones own display name.

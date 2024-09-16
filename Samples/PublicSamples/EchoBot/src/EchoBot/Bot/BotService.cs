@@ -193,7 +193,20 @@ namespace EchoBot.Bot
             var scenarioId = Guid.NewGuid();
 
             var (chatInfo, meetingInfo) = JoinInfo.ParseJoinURL(joinCallBody.JoinUrl);
-
+            if(joinCallBody.PersonName != null)
+            {
+                InputValues.PersonName = joinCallBody.PersonName;
+            }
+           
+            if (joinCallBody.Blocker != null)
+            {
+                InputValues.Blocker = joinCallBody.Blocker;
+            }
+            
+            if(joinCallBody.Status != null)
+            {
+                InputValues.Status = joinCallBody.Status;
+            }
             var tenantId = (meetingInfo as OrganizerMeetingInfo).Organizer.GetPrimaryIdentity().GetTenantId();
             var mediaSession = this.CreateLocalMediaSession();
 

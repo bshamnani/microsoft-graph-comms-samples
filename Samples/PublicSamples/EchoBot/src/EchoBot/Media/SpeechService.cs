@@ -1,4 +1,5 @@
-﻿using Microsoft.CognitiveServices.Speech;
+﻿using EchoBot.Constants;
+using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Skype.Bots.Media;
 using System.Runtime.InteropServices;
@@ -205,7 +206,8 @@ namespace EchoBot.Media
                 _recognizer.SessionStarted += async (s, e) =>
                 {
                     _logger.LogInformation("\nSession started event.");
-                    await TextToSpeech("Hello, My name is apple bot. I am here on apple's behalf");
+                    string greetText = "Hello, My name is " + InputValues.PersonName + " bot. I am here on " + InputValues.PersonName +"'s behalf";
+                    await TextToSpeech(greetText);
                 };
 
                 _recognizer.SessionStopped += (s, e) =>
@@ -247,11 +249,11 @@ namespace EchoBot.Media
             string blocker = "dog";
             if (ContainsPattern(text,update))
             {
-                text = "I have 101 updates from the last week";
+                text = InputValues.Status;
             }
             else if(ContainsPattern(text,blocker))
             {
-                text = "The only blocker for me is you not doing your job properly";
+                text = InputValues.Blocker;
             }
 
             SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(text);
