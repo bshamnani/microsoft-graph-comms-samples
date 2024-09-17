@@ -3,6 +3,11 @@ using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using Microsoft.Skype.Bots.Media;
 using System.Runtime.InteropServices;
+using Azure;
+using Azure.AI.OpenAI;
+using Azure.Identity;
+using OpenAI.Chat;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 
 namespace EchoBot.Media
 {
@@ -30,6 +35,8 @@ namespace EchoBot.Media
         private readonly SpeechConfig _speechConfig;
         private SpeechRecognizer _recognizer;
         private readonly SpeechSynthesizer _synthesizer;
+        private string openaiendpoint="";
+        private string openaikey="";
         /// <summary>
         /// Initializes a new instance of the <see cref="SpeechService" /> class.
         public SpeechService(AppSettings settings, ILogger logger)
@@ -39,6 +46,9 @@ namespace EchoBot.Media
             _speechConfig = SpeechConfig.FromSubscription(settings.SpeechConfigKey, settings.SpeechConfigRegion);
             _speechConfig.SpeechSynthesisLanguage = settings.BotLanguage;
             _speechConfig.SpeechRecognitionLanguage = settings.BotLanguage;
+
+            openaiendpoint=settings.OpenaiEndpoint;
+            openaikey=settings.OpenaiKey;
 
             var audioConfig = AudioConfig.FromStreamOutput(_audioOutputStream);
             _synthesizer = new SpeechSynthesizer(_speechConfig, audioConfig);
@@ -255,7 +265,31 @@ namespace EchoBot.Media
             {
                 text = InputValues.Blocker;
             }
+            string inputText = text;
+            if (!string.IsNullOrEmpty(openaikey) && !string.IsNullOrEmpty(openaiendpoint))
+            {
+                AzureKeyCredential credential = new AzureKeyCredential(openaikey);
+                AzureOpenAIClient azureClient = new(new Uri(openaiendpoint), credential);
+                ChatClient chatClient = azureClient.GetChatClient("teamsgptmodel");
 
+
+                ChatCompletion completion = chatClient.CompleteChat(
+                  new ChatMessage[] {
+                    new SystemChatMessage(text),
+
+                  },
+                  new ChatCompletionOptions()
+                  {
+                      Temperature = (float)0.7,
+                      MaxTokens = 800,
+                      FrequencyPenalty = (float)0,
+                      PresencePenalty = (float)0,
+                  }
+                );
+                text=completion.Content[0].Text;
+                //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
+            }
+            string finalText = "your question was " + inputText + "      and the answer is " + text;
             SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(text);
             // take the stream of the result
             // create 20ms media buffers of the stream

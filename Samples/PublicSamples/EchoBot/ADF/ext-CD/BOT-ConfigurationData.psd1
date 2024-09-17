@@ -68,6 +68,8 @@
                 @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'AadAppSecret' },
                 @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'ServiceDnsName' },
                 @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'SpeechConfigKey' },
+                @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'OpenaiKey' },
+                @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'OpenaiEndpoint' },
                 @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'CertificateThumbprint' },
                 @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'Prefix' },
                 @{Prefix = 'AppSettings:'; KVName = '{0}-kv'; Name = 'OrgName' },

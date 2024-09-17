@@ -66,6 +66,16 @@ namespace EchoBot
         public string SpeechConfigKey { get; set; }
 
         /// <summary>
+        /// Gets or sets the openai key
+        /// </summary>
+        public string OpenaiKey { get; set; }
+
+        /// <summary>
+        /// Gets or sets the openai endpoint
+        /// </summary>
+        public string OpenaiEndpoint { get; set; }
+
+        /// <summary>
         /// Gets or sets the Speech Service region
         /// </summary>
         public string SpeechConfigRegion { get; set; }
