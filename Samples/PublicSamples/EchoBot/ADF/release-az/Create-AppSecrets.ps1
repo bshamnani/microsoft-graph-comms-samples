@@ -59,6 +59,8 @@ $RequiredSecrets = @(
 $SpeechServicesSecrets = @(
     @{ Name = 'UseSpeechService'; Message = 'Enter all the secrets and settings for Speech Service mode'; },
     @{ Name = 'SpeechConfigKey'; Message = 'Enter the Speech Service Key'; },
+    @{ Name = 'OpenaiEndpoint'; Message = 'Enter the Speech Service Key'; },
+    @{ Name = 'OpenaiKey'; Message = 'Enter the Speech Service Key'; },
     @{ Name = 'SpeechConfigRegion'; Message = 'Enter the Azure Region for your Speech Service (ie centralus, eastus2)'; },
     @{ Name = 'BotLanguage'; Message = 'Enter the language code you want your bot to understand and speak (ie en-US, es-MX, fr-FR)'; }
 )
