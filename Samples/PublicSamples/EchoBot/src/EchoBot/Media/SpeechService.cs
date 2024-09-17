@@ -35,10 +35,10 @@ namespace EchoBot.Media
         private readonly SpeechConfig _speechConfig;
         private SpeechRecognizer _recognizer;
         private readonly SpeechSynthesizer _synthesizer;
-        private string openaiendpoint="";
-        private string openaikey="";
+        public static string openaiendpoint="";
+        public static string openaikey="";
         /// <summary>
-        /// Initializes a new instance of the <see cref="SpeechService" /> class.
+                                      /// Initializes a new instance of the <see cref="SpeechService" /> class.
         public SpeechService(AppSettings settings, ILogger logger)
         {
             _logger = logger;
@@ -268,29 +268,41 @@ namespace EchoBot.Media
             string inputText = text;
             if (!string.IsNullOrEmpty(openaikey) && !string.IsNullOrEmpty(openaiendpoint))
             {
-                AzureKeyCredential credential = new AzureKeyCredential(openaikey);
-                AzureOpenAIClient azureClient = new(new Uri(openaiendpoint), credential);
-                ChatClient chatClient = azureClient.GetChatClient("teamsgptmodel");
+                try
+                {
+                    AzureKeyCredential credential = new AzureKeyCredential(openaikey);
+                    AzureOpenAIClient azureClient = new(new Uri(openaiendpoint), credential);
+                    ChatClient chatClient = azureClient.GetChatClient("teamsgptmodel");
 
-
-                ChatCompletion completion = chatClient.CompleteChat(
-                  new ChatMessage[] {
-                    new SystemChatMessage(text),
-
-                  },
-                  new ChatCompletionOptions()
-                  {
-                      Temperature = (float)0.7,
-                      MaxTokens = 800,
-                      FrequencyPenalty = (float)0,
-                      PresencePenalty = (float)0,
-                  }
-                );
-                text=completion.Content[0].Text;
+                    ChatCompletion completion = chatClient.CompleteChat(
+                        new ChatMessage[] {
+                            new SystemChatMessage(text),
+                        },
+                        new ChatCompletionOptions()
+                        {
+                            Temperature = (float)0.7,
+                            MaxTokens = 800,
+                            FrequencyPenalty = (float)0,
+                            PresencePenalty = (float)0,
+                        }
+                    );
+                    text = completion.Content[0].Text;
+                }
+                catch (Exception ex)
+                {
+                    // Handle the exception here
+                    //_logger.LogError(ex, "Exception occurred while sending request to Azure OpenAI");
+                    // You can add additional error handling code here if needed
+                    text = "I am sorry, I cannot reach gpt model";
+                }
                 //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
             }
+            else
+            {
+                text = "I am sorry, the variables are not set";
+            }
             string finalText = "your question was " + inputText + "      and the answer is " + text;
-            SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(text);
+            SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(finalText);
             // take the stream of the result
             // create 20ms media buffers of the stream
             // and send to the AudioSocket in the BotMediaStream
