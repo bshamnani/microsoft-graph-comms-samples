@@ -265,12 +265,12 @@ namespace EchoBot.Media
                 text = InputValues.Blocker;
             }
             string inputText = text;
-            if (!string.IsNullOrEmpty(openaikey) && !string.IsNullOrEmpty(openaiendpoint))
+            if (!string.IsNullOrEmpty(InputValues.Openaikey) && !string.IsNullOrEmpty(InputValues.Openaiendpoint))
             {
                 try
                 {
-                    AzureKeyCredential credential = new AzureKeyCredential(openaikey);
-                    AzureOpenAIClient azureClient = new(new Uri(openaiendpoint), credential);
+                    AzureKeyCredential credential = new AzureKeyCredential(InputValues.Openaikey);
+                    AzureOpenAIClient azureClient = new(new Uri(InputValues.Openaiendpoint), credential);
                     ChatClient chatClient = azureClient.GetChatClient("teamsgptmodel");
 
                     ChatCompletion completion = chatClient.CompleteChat(
@@ -292,7 +292,7 @@ namespace EchoBot.Media
                     // Handle the exception here
                     //_logger.LogError(ex, "Exception occurred while sending request to Azure OpenAI");
                     // You can add additional error handling code here if needed
-                    text = "I am sorry, I cannot reach gpt model";
+                    text = "I am sorry, I cannot reach gpt model " + ex;
                 }
                 //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
             }
