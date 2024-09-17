@@ -14,5 +14,7 @@ namespace EchoBot.Constants
 
         public static string Blocker { get; set; } = "No blockers for me";
 
+        public static string Openaiendpoint { get; set; } = "";
+        public static string Openaikey { get; set; } = "";
     }
 }

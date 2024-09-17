@@ -35,8 +35,7 @@ namespace EchoBot.Media
         private readonly SpeechConfig _speechConfig;
         private SpeechRecognizer _recognizer;
         private readonly SpeechSynthesizer _synthesizer;
-        public static string openaiendpoint="";
-        public static string openaikey="";
+        
         /// <summary>
                                       /// Initializes a new instance of the <see cref="SpeechService" /> class.
         public SpeechService(AppSettings settings, ILogger logger)
@@ -47,8 +46,8 @@ namespace EchoBot.Media
             _speechConfig.SpeechSynthesisLanguage = settings.BotLanguage;
             _speechConfig.SpeechRecognitionLanguage = settings.BotLanguage;
 
-            openaiendpoint=settings.OpenaiEndpoint;
-            openaikey=settings.OpenaiKey;
+            InputValues.Openaiendpoint=settings.OpenaiEndpoint;
+            InputValues.Openaikey=settings.OpenaiKey;
 
             var audioConfig = AudioConfig.FromStreamOutput(_audioOutputStream);
             _synthesizer = new SpeechSynthesizer(_speechConfig, audioConfig);
