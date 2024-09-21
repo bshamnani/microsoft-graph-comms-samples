@@ -76,6 +76,11 @@ namespace EchoBot
         public string OpenaiEndpoint { get; set; }
 
         /// <summary>
+        /// Gets or sets the sa connection string
+        /// </summary>
+        public string SaConnectionString { get; set; }
+
+        /// <summary>
         /// Gets or sets the Speech Service region
         /// </summary>
         public string SpeechConfigRegion { get; set; }

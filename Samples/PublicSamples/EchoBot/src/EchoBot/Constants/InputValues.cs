@@ -16,5 +16,7 @@ namespace EchoBot.Constants
 
         public static string Openaiendpoint { get; set; } = "";
         public static string Openaikey { get; set; } = "";
+
+        public static string SaConnectionString { get; set; } = "";
     }
 }

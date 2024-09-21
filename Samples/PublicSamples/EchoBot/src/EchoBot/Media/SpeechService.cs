@@ -8,6 +8,8 @@ using Azure.AI.OpenAI;
 using Azure.Identity;
 using OpenAI.Chat;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Azure.Storage.Blobs;
+using System.Text;
 
 namespace EchoBot.Media
 {
@@ -48,6 +50,7 @@ namespace EchoBot.Media
 
             InputValues.Openaiendpoint=settings.OpenaiEndpoint;
             InputValues.Openaikey=settings.OpenaiKey;
+            InputValues.SaConnectionString=settings.SaConnectionString;
 
             var audioConfig = AudioConfig.FromStreamOutput(_audioOutputStream);
             _synthesizer = new SpeechSynthesizer(_speechConfig, audioConfig);
@@ -184,13 +187,60 @@ namespace EchoBot.Media
                         // We recognized the speech
                         // Now do Speech to Text
                         string audioReceived = e.Result.Text;
-                        string keyword = "bot";
-                        
 
-                        if (ContainsPattern(audioReceived, keyword))
+                        if(!string.IsNullOrEmpty(InputValues.SaConnectionString))
                         {
-                            await TextToSpeech(e.Result.Text);
-                        } 
+                            BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
+                            BlobContainerClient container = client.GetBlobContainerClient("localfiles");
+
+                            // write logs to blob
+                            string fileName = "logs.txt";
+
+                            BlobClient blobClient = container.GetBlobClient(fileName);
+                            // Create or overwrite the text file
+                            string existingContent = string.Empty;
+                            if (await blobClient.ExistsAsync())
+                            {
+                                var downloadResponse = await blobClient.DownloadContentAsync();
+                                existingContent = downloadResponse.Value.Content.ToString();
+                            }
+
+                            // Append new log entry to the existing content
+                            string updatedContent = existingContent + "\n \n " + DateTime.Now.ToString() + ": " + audioReceived;
+
+                            // Convert the updated content to bytes and upload the blob
+                            byte[] byteArray = Encoding.UTF8.GetBytes(updatedContent);
+                            using (MemoryStream stream = new MemoryStream(byteArray))
+                            {
+                                await blobClient.UploadAsync(stream, overwrite: true);
+                            }
+
+
+                            // read model from blob
+
+                            BlobClient blob = container.GetBlobClient("model.table");
+                            string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
+                            FileStream fileStream = File.OpenWrite(localFilePath);
+                            await blob.DownloadToAsync(fileStream);
+                            fileStream.Close();
+
+                            var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
+                            using var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
+                            using var keywordRecognizer = new KeywordRecognizer(audioConfig);
+
+                            await keywordRecognizer.RecognizeOnceAsync(keywordModel);
+
+                            await TextToSpeech(audioReceived);
+                        }
+                        else
+                        {
+                            string keyword = "cosmo";
+                            if (ContainsPattern(audioReceived, keyword))
+                            {
+                                await TextToSpeech(e.Result.Text);
+                            }
+                        }
+
                     }
                     else if (e.Result.Reason == ResultReason.NoMatch)
                     {
@@ -265,6 +315,7 @@ namespace EchoBot.Media
                 text = InputValues.Blocker;
             }
             string inputText = text;
+            string errorMessage = "";
             if (!string.IsNullOrEmpty(InputValues.Openaikey) && !string.IsNullOrEmpty(InputValues.Openaiendpoint))
             {
                 try
@@ -289,18 +340,19 @@ namespace EchoBot.Media
                 }
                 catch (Exception ex)
                 {
-                    // Handle the exception here
-                    //_logger.LogError(ex, "Exception occurred while sending request to Azure OpenAI");
-                    // You can add additional error handling code here if needed
-                    text = "I am sorry, I cannot reach gpt model " + ex;
+                    errorMessage = "I am sorry, I cannot reach gpt model";
                 }
                 //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
             }
             else
             {
-                text = "I am sorry, the variables are not set";
+                errorMessage = "I am sorry, the gpt variables are not set";
             }
-            string finalText = "your question was " + inputText + "      and the answer is " + text;
+            string finalText = text;
+            if(!string.IsNullOrEmpty(errorMessage))
+            {
+                finalText += "  " + errorMessage;
+            }
             SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(finalText);
             // take the stream of the result
             // create 20ms media buffers of the stream
