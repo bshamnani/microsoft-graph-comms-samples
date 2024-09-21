@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs;
 using System.Text;
+using System.ComponentModel;
 
 namespace EchoBot.Media
 {
@@ -161,6 +162,17 @@ namespace EchoBot.Media
         {
             try
             {
+                BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
+                BlobContainerClient container = client.GetBlobContainerClient("localfiles");
+
+                BlobClient blob = container.GetBlobClient("model.table");
+                string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
+                using (FileStream fileStream = File.Open(localFilePath, FileMode.Create, FileAccess.Write))
+                {
+                    await blob.DownloadToAsync(fileStream);
+                }
+                var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
+
                 var stopRecognition = new TaskCompletionSource<int>();
 
                 using (var audioInput = AudioConfig.FromStreamInput(_audioInputStream))
@@ -189,13 +201,7 @@ namespace EchoBot.Media
                         // Now do Speech to Text
                         string audioReceived = e.Result.Text;
                         string keyword = "cosmo";
-
-                        BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
-                        BlobContainerClient container = client.GetBlobContainerClient("localfiles");
-
                         string fileName = "logs1.txt";
-
-
                         AppendBlobClient appendBlobClient = container.GetAppendBlobClient(fileName);
 
                         byte[] logBytes = Encoding.UTF8.GetBytes(DateTime.Now.ToString() + ": " + audioReceived + "\n\n");
@@ -204,7 +210,23 @@ namespace EchoBot.Media
                             await appendBlobClient.AppendBlockAsync(stream);
                         }
 
-                        await TextToSpeech(e.Result.Text);
+                        using var keywordAudioConfig = AudioConfig.FromStreamInput(_audioInputStream);
+                        using var keywordRecognizer = new KeywordRecognizer(keywordAudioConfig);
+
+                        KeywordRecognitionResult keywordResult = await keywordRecognizer.RecognizeOnceAsync(keywordModel);
+
+                        logBytes = Encoding.UTF8.GetBytes(DateTime.Now.ToString() + ": keyword input result: " + keywordResult.Text + "\n\n");
+                        using (MemoryStream stream = new MemoryStream(logBytes))
+                        {
+                            await appendBlobClient.AppendBlockAsync(stream);
+                        }
+
+                        if (keywordResult.Reason == ResultReason.RecognizedKeyword)
+                        {
+                            // If keyword is recognized, respond
+                            await TextToSpeech(e.Result.Text);
+                        }
+                        //await TextToSpeech(e.Result.Text);
 
                         //BlobClient blob = container.GetBlobClient("model.table");
                         //string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
@@ -288,14 +310,11 @@ namespace EchoBot.Media
                 // Stops recognition.
                 await _recognizer.StopContinuousRecognitionAsync().ConfigureAwait(false);
             }
-            catch (ObjectDisposedException ex)
-            {
-                _logger.LogError(ex, "The queue processing task object has been disposed.");
-            }
             catch (Exception ex)
             {
                 // Catch all other exceptions and log
-                _logger.LogError(ex, "Caught Exception");
+                //_logger.LogError(ex, "Caught Exception");
+                await WriteLogsToBlob("error in process speech: " + ex.ToString());
             }
 
             _isDraining = false;
@@ -306,16 +325,16 @@ namespace EchoBot.Media
         {
             //text = "My name is bhavesh. I am a bot made by bhavesh. I do as he commands" + text;
             // convert the text to speech
-            string update = "cat";
-            string blocker = "dog";
-            if (ContainsPattern(text, update))
-            {
-                text = InputValues.Status;
-            }
-            else if (ContainsPattern(text, blocker))
-            {
-                text = InputValues.Blocker;
-            }
+            //string update = "cat";
+            //string blocker = "dog";
+            //if (ContainsPattern(text, update))
+            //{
+            //    text = InputValues.Status;
+            //}
+            //else if (ContainsPattern(text, blocker))
+            //{
+            //    text = InputValues.Blocker;
+            //}
             string inputText = text;
             string errorMessage = "";
             if (!string.IsNullOrEmpty(InputValues.Openaikey) && !string.IsNullOrEmpty(InputValues.Openaiendpoint))
