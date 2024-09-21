@@ -10,6 +10,7 @@ using OpenAI.Chat;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Azure.Storage.Blobs;
 using System.Text;
+using Azure.Storage.Blobs.Specialized;
 
 namespace EchoBot.Media
 {
@@ -160,131 +161,122 @@ namespace EchoBot.Media
         {
             try
             {
+                BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
+                BlobContainerClient container = client.GetBlobContainerClient("localfiles");
+                BlobClient blob = container.GetBlobClient("model.table");
+                string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
+                string localDirectory = Path.GetDirectoryName(localFilePath);
+                if (!Directory.Exists(localDirectory))
+                {
+                    Directory.CreateDirectory(localDirectory);
+                }
+                using (FileStream fileStream = File.Open(localFilePath, FileMode.Create, FileAccess.Write))
+                {
+                    await blob.DownloadToAsync(fileStream);
+                }
+
+                var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
+
+
                 var stopRecognition = new TaskCompletionSource<int>();
 
                 using (var audioInput = AudioConfig.FromStreamInput(_audioInputStream))
                 {
-                    if (_recognizer == null)
+                    using (var keywordRecognizer = new KeywordRecognizer(audioInput))
                     {
-                        _logger.LogInformation("init recognizer");
-                        _recognizer = new SpeechRecognizer(_speechConfig, audioInput);
-                    }
-                }
-
-                _recognizer.Recognizing += (s, e) =>
-                {
-                    _logger.LogInformation($"RECOGNIZING: Text={e.Result.Text}");
-                };
-
-                _recognizer.Recognized += async (s, e) =>
-                {
-                    if (e.Result.Reason == ResultReason.RecognizedSpeech)
-                    {
-                        if (string.IsNullOrEmpty(e.Result.Text))
-                            return;
-
-                        _logger.LogInformation($"RECOGNIZED: Text={e.Result.Text}");
-                        // We recognized the speech
-                        // Now do Speech to Text
-                        string audioReceived = e.Result.Text;
-
-                        if(!string.IsNullOrEmpty(InputValues.SaConnectionString))
+                        var result = await keywordRecognizer.RecognizeOnceAsync(keywordModel);
+                        if (result.Reason == ResultReason.RecognizedKeyword)
                         {
-                            BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
-                            BlobContainerClient container = client.GetBlobContainerClient("localfiles");
+                            _logger.LogInformation($"Keyword recognized: {result.Text}");
 
-                            // write logs to blob
-                            string fileName = "logs.txt";
-
-                            BlobClient blobClient = container.GetBlobClient(fileName);
-                            // Create or overwrite the text file
-                            string existingContent = string.Empty;
-                            if (await blobClient.ExistsAsync())
+                            // Initialize the speech recognizer once the keyword is recognized
+                            if (_recognizer == null)
                             {
-                                var downloadResponse = await blobClient.DownloadContentAsync();
-                                existingContent = downloadResponse.Value.Content.ToString();
+                                _logger.LogInformation("Initializing speech recognizer after keyword recognition...");
+                                _recognizer = new SpeechRecognizer(_speechConfig, audioInput);
                             }
 
-                            // Append new log entry to the existing content
-                            string updatedContent = existingContent + "\n \n " + DateTime.Now.ToString() + ": " + audioReceived;
-
-                            // Convert the updated content to bytes and upload the blob
-                            byte[] byteArray = Encoding.UTF8.GetBytes(updatedContent);
-                            using (MemoryStream stream = new MemoryStream(byteArray))
+                            _recognizer.Recognizing += (s, e) =>
                             {
-                                await blobClient.UploadAsync(stream, overwrite: true);
-                            }
+                                _logger.LogInformation($"RECOGNIZING: Text={e.Result.Text}");
+                            };
 
+                            _recognizer.Recognized += async (s, e) =>
+                            {
+                                if (e.Result.Reason == ResultReason.RecognizedSpeech)
+                                {
+                                    if (string.IsNullOrEmpty(e.Result.Text))
+                                        return;
 
-                            // read model from blob
+                                    _logger.LogInformation($"RECOGNIZED: Text={e.Result.Text}");
+                                    // We recognized the speech
+                                    // Now do Speech to Text
+                                    string audioReceived = e.Result.Text;
 
-                            BlobClient blob = container.GetBlobClient("model.table");
-                            string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
-                            FileStream fileStream = File.OpenWrite(localFilePath);
-                            await blob.DownloadToAsync(fileStream);
-                            fileStream.Close();
+                                    if(!string.IsNullOrEmpty(InputValues.SaConnectionString))
+                                    {
+                                        await WriteLogsToBlob("success: " + audioReceived);
+                                    }
+                                    else
+                                    {
+                                        string keyword = "cosmo";
+                                        if (ContainsPattern(audioReceived, keyword))
+                                        {
+                                            await TextToSpeech(e.Result.Text);
+                                        }
+                                    }
 
-                            var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
-                            using var audioConfig = AudioConfig.FromDefaultMicrophoneInput();
-                            using var keywordRecognizer = new KeywordRecognizer(audioConfig);
+                                }
+                                else if (e.Result.Reason == ResultReason.NoMatch)
+                                {
+                                    _logger.LogInformation($"NOMATCH: Speech could not be recognized.");
+                                }
+                            };
 
-                            await keywordRecognizer.RecognizeOnceAsync(keywordModel);
+                            _recognizer.Canceled += (s, e) =>
+                            {
+                                _logger.LogInformation($"CANCELED: Reason={e.Reason}");
 
-                            await TextToSpeech(audioReceived);
+                                if (e.Reason == CancellationReason.Error)
+                                {
+                                    _logger.LogInformation($"CANCELED: ErrorCode={e.ErrorCode}");
+                                    _logger.LogInformation($"CANCELED: ErrorDetails={e.ErrorDetails}");
+                                    _logger.LogInformation($"CANCELED: Did you update the subscription info?");
+                                }
+
+                                stopRecognition.TrySetResult(0);
+                            };
+
+                            _recognizer.SessionStarted += async (s, e) =>
+                            {
+                                _logger.LogInformation("\nSession started event.");
+                                string greetText = "Hello, My name is " + InputValues.PersonName + " bot. I am here on " + InputValues.PersonName +"'s behalf";
+                                await TextToSpeech(greetText);
+                            };
+
+                            _recognizer.SessionStopped += (s, e) =>
+                            {
+                                _logger.LogInformation("\nSession stopped event.");
+                                _logger.LogInformation("\nStop recognition.");
+                                stopRecognition.TrySetResult(0);
+                            };
+
+                            // Starts continuous recognition. Uses StopContinuousRecognitionAsync() to stop recognition.
+                            await _recognizer.StartContinuousRecognitionAsync().ConfigureAwait(false);
+
+                            // Waits for completion.
+                            // Use Task.WaitAny to keep the task rooted.
+                            Task.WaitAny(new[] { stopRecognition.Task });
+
+                            // Stops recognition.
+                            await _recognizer.StopContinuousRecognitionAsync().ConfigureAwait(false);
                         }
                         else
                         {
-                            string keyword = "cosmo";
-                            if (ContainsPattern(audioReceived, keyword))
-                            {
-                                await TextToSpeech(e.Result.Text);
-                            }
+                            await WriteLogsToBlob("error: keyword not recognized, try again or contact us.");
                         }
-
-                    }
-                    else if (e.Result.Reason == ResultReason.NoMatch)
-                    {
-                        _logger.LogInformation($"NOMATCH: Speech could not be recognized.");
-                    }
-                };
-
-                _recognizer.Canceled += (s, e) =>
-                {
-                    _logger.LogInformation($"CANCELED: Reason={e.Reason}");
-
-                    if (e.Reason == CancellationReason.Error)
-                    {
-                        _logger.LogInformation($"CANCELED: ErrorCode={e.ErrorCode}");
-                        _logger.LogInformation($"CANCELED: ErrorDetails={e.ErrorDetails}");
-                        _logger.LogInformation($"CANCELED: Did you update the subscription info?");
-                    }
-
-                    stopRecognition.TrySetResult(0);
-                };
-
-                _recognizer.SessionStarted += async (s, e) =>
-                {
-                    _logger.LogInformation("\nSession started event.");
-                    string greetText = "Hello, My name is " + InputValues.PersonName + " bot. I am here on " + InputValues.PersonName +"'s behalf";
-                    await TextToSpeech(greetText);
-                };
-
-                _recognizer.SessionStopped += (s, e) =>
-                {
-                    _logger.LogInformation("\nSession stopped event.");
-                    _logger.LogInformation("\nStop recognition.");
-                    stopRecognition.TrySetResult(0);
-                };
-
-                // Starts continuous recognition. Uses StopContinuousRecognitionAsync() to stop recognition.
-                await _recognizer.StartContinuousRecognitionAsync().ConfigureAwait(false);
-
-                // Waits for completion.
-                // Use Task.WaitAny to keep the task rooted.
-                Task.WaitAny(new[] { stopRecognition.Task });
-
-                // Stops recognition.
-                await _recognizer.StopContinuousRecognitionAsync().ConfigureAwait(false);
+                    }                
+                }    
             }
             catch (ObjectDisposedException ex)
             {
@@ -365,6 +357,33 @@ namespace EchoBot.Media
                     AudioMediaBuffers = Util.Utilities.CreateAudioMediaBuffers(stream, currentTick, _logger)
                 };
                 OnSendMediaBufferEventArgs(this, args);
+            }
+        }
+        /// <summary>
+        /// Writes logs to a blob storage.
+        /// </summary>
+        /// <param name="text">The text to be logged.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private async Task WriteLogsToBlob(string text)
+        {
+            try
+            {
+                BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
+                BlobContainerClient container = client.GetBlobContainerClient("localfiles");
+
+                // Write logs to blob
+                string fileName = "logs1.txt";
+                AppendBlobClient appendBlobClient = container.GetAppendBlobClient(fileName);
+
+                byte[] logBytes = Encoding.UTF8.GetBytes(DateTime.Now.ToString() + ": " + text + "\n\n");
+                using (MemoryStream stream = new MemoryStream(logBytes))
+                {
+                    await appendBlobClient.AppendBlockAsync(stream);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception occurred while writing logs to blob.");
             }
         }
     }
