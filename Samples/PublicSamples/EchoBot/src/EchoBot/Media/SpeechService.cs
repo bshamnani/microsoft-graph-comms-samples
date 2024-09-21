@@ -204,39 +204,40 @@ namespace EchoBot.Media
                             await appendBlobClient.AppendBlockAsync(stream);
                         }
 
+                        await TextToSpeech(e.Result.Text);
 
-                        BlobClient blob = container.GetBlobClient("model.table");
-                        string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
-                        using (FileStream fileStream = File.Open(localFilePath, FileMode.Create, FileAccess.Write))
-                        {
-                            await blob.DownloadToAsync(fileStream);
-                        }
-                        var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
+                        //BlobClient blob = container.GetBlobClient("model.table");
+                        //string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
+                        //using (FileStream fileStream = File.Open(localFilePath, FileMode.Create, FileAccess.Write))
+                        //{
+                        //    await blob.DownloadToAsync(fileStream);
+                        //}
+                        //var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
 
-                        using (var audioInput = AudioConfig.FromStreamInput(_audioInputStream))
-                        {
-                            using var keywordRecognizer = new KeywordRecognizer(audioInput);
+                        //using (var audioInput = AudioConfig.FromStreamInput(_audioInputStream))
+                        //{
+                        //    using var keywordRecognizer = new KeywordRecognizer(audioInput);
 
-                            KeywordRecognitionResult resultKey = await keywordRecognizer.RecognizeOnceAsync(keywordModel);
+                        //    KeywordRecognitionResult resultKey = await keywordRecognizer.RecognizeOnceAsync(keywordModel);
 
-                            string printKey = "";
+                        //    string printKey = "";
 
-                            if (resultKey.Reason == ResultReason.RecognizedKeyword)
-                            {
-                                printKey+= "Keyword recognized: ";
-                            }
-                            else
-                            {
-                                printKey+= "No match found: ";
-                            }
-                            printKey += resultKey.Text;
+                        //    if (resultKey.Reason == ResultReason.RecognizedKeyword)
+                        //    {
+                        //        printKey+= "Keyword recognized: ";
+                        //    }
+                        //    else
+                        //    {
+                        //        printKey+= "No match found: ";
+                        //    }
+                        //    printKey += resultKey.Text;
 
-                            logBytes = Encoding.UTF8.GetBytes(DateTime.Now.ToString() + ": " + printKey + "\n\n");
-                            using (MemoryStream stream = new MemoryStream(logBytes))
-                            {
-                                await appendBlobClient.AppendBlockAsync(stream);
-                            }
-                        }
+                        //    logBytes = Encoding.UTF8.GetBytes(DateTime.Now.ToString() + ": " + printKey + "\n\n");
+                        //    using (MemoryStream stream = new MemoryStream(logBytes))
+                        //    {
+                        //        await appendBlobClient.AppendBlockAsync(stream);
+                        //    }
+                        //}
 
                         //if (ContainsPattern(audioReceived, keyword))
                         //{
@@ -341,7 +342,7 @@ namespace EchoBot.Media
                 }
                 catch (Exception ex)
                 {
-                    errorMessage = "I am sorry, I cannot reach gpt model";
+                    errorMessage = "I am sorry, I cannot reach gpt model" + ex;
                 }
                 //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
             }
