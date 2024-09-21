@@ -324,7 +324,7 @@ namespace EchoBot.Media
                 {
                     AzureKeyCredential credential = new AzureKeyCredential(InputValues.Openaikey);
                     AzureOpenAIClient azureClient = new(new Uri(InputValues.Openaiendpoint), credential);
-                    ChatClient chatClient = azureClient.GetChatClient("teamsgptmodel");
+                    ChatClient chatClient = azureClient.GetChatClient("gptmodel");
 
                     ChatCompletion completion = chatClient.CompleteChat(
                         new ChatMessage[] {
