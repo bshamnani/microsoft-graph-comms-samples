@@ -11,7 +11,6 @@ using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs;
 using System.Text;
-using System.ComponentModel;
 
 namespace EchoBot.Media
 {
@@ -162,17 +161,6 @@ namespace EchoBot.Media
         {
             try
             {
-                BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
-                BlobContainerClient container = client.GetBlobContainerClient("localfiles");
-
-                BlobClient blob = container.GetBlobClient("model.table");
-                string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
-                using (FileStream fileStream = File.Open(localFilePath, FileMode.Create, FileAccess.Write))
-                {
-                    await blob.DownloadToAsync(fileStream);
-                }
-                var keywordModel = KeywordRecognitionModel.FromFile(localFilePath);
-
                 var stopRecognition = new TaskCompletionSource<int>();
 
                 using (var audioInput = AudioConfig.FromStreamInput(_audioInputStream))
@@ -201,6 +189,10 @@ namespace EchoBot.Media
                         // Now do Speech to Text
                         string audioReceived = e.Result.Text;
                         string keyword = "cosmo";
+
+                        BlobServiceClient client = new BlobServiceClient(InputValues.SaConnectionString);
+                        BlobContainerClient container = client.GetBlobContainerClient("localfiles");
+
                         string fileName = "logs1.txt";
                         AppendBlobClient appendBlobClient = container.GetAppendBlobClient(fileName);
 
@@ -210,23 +202,7 @@ namespace EchoBot.Media
                             await appendBlobClient.AppendBlockAsync(stream);
                         }
 
-                        using var keywordAudioConfig = AudioConfig.FromStreamInput(_audioInputStream);
-                        using var keywordRecognizer = new KeywordRecognizer(keywordAudioConfig);
-
-                        KeywordRecognitionResult keywordResult = await keywordRecognizer.RecognizeOnceAsync(keywordModel);
-
-                        logBytes = Encoding.UTF8.GetBytes(DateTime.Now.ToString() + ": keyword input result: " + keywordResult.Text + "\n\n");
-                        using (MemoryStream stream = new MemoryStream(logBytes))
-                        {
-                            await appendBlobClient.AppendBlockAsync(stream);
-                        }
-
-                        if (keywordResult.Reason == ResultReason.RecognizedKeyword)
-                        {
-                            // If keyword is recognized, respond
-                            await TextToSpeech(e.Result.Text);
-                        }
-                        //await TextToSpeech(e.Result.Text);
+                        await TextToSpeech(e.Result.Text);
 
                         //BlobClient blob = container.GetBlobClient("model.table");
                         //string localFilePath = Path.Combine(Path.GetTempPath(), "model.table");
@@ -310,11 +286,14 @@ namespace EchoBot.Media
                 // Stops recognition.
                 await _recognizer.StopContinuousRecognitionAsync().ConfigureAwait(false);
             }
+            catch (ObjectDisposedException ex)
+            {
+                _logger.LogError(ex, "The queue processing task object has been disposed.");
+            }
             catch (Exception ex)
             {
                 // Catch all other exceptions and log
-                //_logger.LogError(ex, "Caught Exception");
-                await WriteLogsToBlob("error in process speech: " + ex.ToString());
+                _logger.LogError(ex, "Caught Exception");
             }
 
             _isDraining = false;
@@ -336,47 +315,47 @@ namespace EchoBot.Media
             //    text = InputValues.Blocker;
             //}
             string inputText = text;
-            string errorMessage = "";
-            if (!string.IsNullOrEmpty(InputValues.Openaikey) && !string.IsNullOrEmpty(InputValues.Openaiendpoint))
-            {
-                try
-                {
-                    AzureKeyCredential credential = new AzureKeyCredential(InputValues.Openaikey);
-                    AzureOpenAIClient azureClient = new(new Uri(InputValues.Openaiendpoint), credential);
-                    ChatClient chatClient = azureClient.GetChatClient("gptmodel");
+            //string errorMessage = "";
+            //if (!string.IsNullOrEmpty(InputValues.Openaikey) && !string.IsNullOrEmpty(InputValues.Openaiendpoint))
+            //{
+            //    try
+            //    {
+            //        AzureKeyCredential credential = new AzureKeyCredential(InputValues.Openaikey);
+            //        AzureOpenAIClient azureClient = new(new Uri(InputValues.Openaiendpoint), credential);
+            //        ChatClient chatClient = azureClient.GetChatClient("gptmodel");
 
-                    ChatCompletion completion = chatClient.CompleteChat(
-                        new ChatMessage[] {
-                            new SystemChatMessage(text),
-                        },
-                        new ChatCompletionOptions()
-                        {
-                            Temperature = (float)0.7,
-                            MaxTokens = 800,
-                            FrequencyPenalty = (float)0,
-                            PresencePenalty = (float)0,
-                        }
-                    );
-                    text = completion.Content[0].Text;
-                }
-                catch (Exception ex)
-                {
-                    errorMessage = "I am sorry, I cannot reach gpt model" + ex;
-                }
-                //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
-            }
-            else
-            {
-                errorMessage = "I am sorry, the gpt variables are not set";
-            }
-            string finalText = text;
-            if(!string.IsNullOrEmpty(errorMessage))
-            {
-                finalText += "  " + errorMessage;
-            }
-            await WriteLogsToBlob(finalText);
+            //        ChatCompletion completion = chatClient.CompleteChat(
+            //            new ChatMessage[] {
+            //                new SystemChatMessage(text),
+            //            },
+            //            new ChatCompletionOptions()
+            //            {
+            //                Temperature = (float)0.7,
+            //                MaxTokens = 800,
+            //                FrequencyPenalty = (float)0,
+            //                PresencePenalty = (float)0,
+            //            }
+            //        );
+            //        text = completion.Content[0].Text;
+            //    }
+            //    catch (Exception ex)
+            //    {
+            //        errorMessage = "I am sorry, I cannot reach gpt model" + ex;
+            //    }
+            //    //Console.WriteLine($"{completion.Content[0].Text}: {completion.Content[0].Text}");
+            //}
+            //else
+            //{
+            //    errorMessage = "I am sorry, the gpt variables are not set";
+            //}
+            //string finalText = text;
+            //if (!string.IsNullOrEmpty(errorMessage))
+            //{
+            //    finalText += "  " + errorMessage;
+            //}
+            await WriteLogsToBlob(text);
 
-            SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(finalText);
+            SpeechSynthesisResult result = await _synthesizer.SpeakTextAsync(text);
             // take the stream of the result
             // create 20ms media buffers of the stream
             // and send to the AudioSocket in the BotMediaStream
